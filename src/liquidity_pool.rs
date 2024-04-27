@@ -25,4 +25,15 @@ impl<T: Config> LiquidityPool<T> {
         self.reserves.1 = self.reserves.1 + amounts.1;
         self.total_liquidity = self.total_liquidity + liquidity_minted;
     }
+
+    // Function to burn liquidity tokens and update reserves
+    pub fn burn(
+        &mut self,
+        amounts: (AssetBalanceOf<T>, AssetBalanceOf<T>),
+        liquidity_burned: AssetBalanceOf<T>,
+    ) {
+        self.reserves.0 = self.reserves.0 - amounts.0;
+        self.reserves.1 = self.reserves.1 - amounts.1;
+        self.total_liquidity = self.total_liquidity - liquidity_burned;
+    }
 }
