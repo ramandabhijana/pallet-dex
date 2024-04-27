@@ -92,6 +92,8 @@ pub mod pallet {
         InsufficientLiquidity,
         /// Insufficient reserves available in the pool for the requested operation
         InsufficientReserves,
+        LiquidityOverflow,
+        ReserveOverflow,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
