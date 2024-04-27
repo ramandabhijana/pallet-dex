@@ -10,6 +10,8 @@ pub use pallet::*;
 #[cfg(test)]
 mod mock;
 
+mod liquidity_pool;
+
 // This module contains the unit tests for this pallet.
 #[cfg(test)]
 mod tests;
@@ -28,21 +30,12 @@ pub type AssetBalanceOf<T> = <<T as Config>::Fungibles as fungibles::Inspect<
     <T as frame_system::Config>::AccountId,
 >>::Balance;
 
-#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
-#[scale_info(skip_type_params(T))]
-pub struct LiquidityPool<T: Config> {
-    pub assets: (AssetIdOf<T>, AssetIdOf<T>),
-    pub reserves: (AssetBalanceOf<T>, AssetBalanceOf<T>),
-    pub total_liquidity: AssetBalanceOf<T>,
-    pub liquidity_token: AssetIdOf<T>,
-    _marker: PhantomData<T>,
-}
-
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
 pub mod pallet {
     // Import various useful types required by all FRAME pallets.
     use super::*;
+    use crate::liquidity_pool::LiquidityPool;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
 
