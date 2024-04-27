@@ -1,7 +1,8 @@
-use crate::pallet::Config;
+use crate::pallet::{Config, Error};
 use crate::{AssetBalanceOf, AssetIdOf};
 use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::pallet_prelude::{RuntimeDebug, TypeInfo};
+use frame_support::pallet_prelude::{DispatchResult, RuntimeDebug, TypeInfo};
+use frame_support::sp_runtime::traits::CheckedSub;
 use std::marker::PhantomData;
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
@@ -31,9 +32,21 @@ impl<T: Config> LiquidityPool<T> {
         &mut self,
         amounts: (AssetBalanceOf<T>, AssetBalanceOf<T>),
         liquidity_burned: AssetBalanceOf<T>,
-    ) {
-        self.reserves.0 = self.reserves.0 - amounts.0;
-        self.reserves.1 = self.reserves.1 - amounts.1;
-        self.total_liquidity = self.total_liquidity - liquidity_burned;
+    ) -> DispatchResult {
+        self.reserves.0 = self
+            .reserves
+            .0
+            .checked_sub(&amounts.0)
+            .ok_or(Error::<T>::InsufficientReserves)?;
+        self.reserves.1 = self
+            .reserves
+            .1
+            .checked_sub(&amounts.1)
+            .ok_or(Error::<T>::InsufficientReserves)?;
+        self.total_liquidity = self
+            .total_liquidity
+            .checked_sub(&liquidity_burned)
+            .ok_or(Error::<T>::InsufficientLiquidity)?;
+        Ok(())
     }
 }
