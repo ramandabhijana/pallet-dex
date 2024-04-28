@@ -213,6 +213,22 @@ pub mod pallet {
             Self::transfer_asset_to_pool(&sender, trading_pair.0, amount_a)?;
             Self::transfer_asset_to_pool(&sender, trading_pair.1, amount_b)?;
 
+            // Mint liquidity tokens to the sender
+            Self::mint_liquidity_tokens(&sender, liquidity_pool.liquidity_token, liquidity_minted)?;
+
+            // Update the liquidity pool reserves and total liquidity
+            liquidity_pool.mint((amount_a, amount_b), liquidity_minted)?;
+
+            // Update the liquidity pool in storage
+            LiquidityPools::<T>::insert(&trading_pair, liquidity_pool);
+
+            // Emit the LiquidityMinted event
+            Self::deposit_event(Event::LiquidityMinted(
+                sender,
+                trading_pair,
+                liquidity_minted,
+            ));
+
             Ok(())
         }
     }
@@ -282,6 +298,16 @@ pub mod pallet {
                 Preservation::Expendable,
             )?;
 
+            Ok(())
+        }
+
+        fn mint_liquidity_tokens(
+            recipient: &AccountIdOf<T>,
+            liquidity_token_id: AssetIdOf<T>,
+            amount: AssetBalanceOf<T>,
+        ) -> DispatchResult {
+            // Mint the liquidity tokens to the recipient
+            T::Fungibles::mint_into(liquidity_token_id, recipient, amount)?;
             Ok(())
         }
     }
