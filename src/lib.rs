@@ -42,7 +42,10 @@ pub mod pallet {
     // Import various useful types required by all FRAME pallets.
     use super::*;
     use crate::liquidity_pool::LiquidityPool;
-    use frame_support::pallet_prelude::*;
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{fungibles::Mutate, tokens::Preservation},
+    };
     use frame_system::pallet_prelude::*;
 
     // The `Pallet` struct serves as a placeholder to implement traits, methods and dispatchables
@@ -206,6 +209,10 @@ pub mod pallet {
                 Error::<T>::InsufficientLiquidityMinted
             );
 
+            // Transfer the assets from the sender to the liquidity pool
+            Self::transfer_asset_to_pool(&sender, trading_pair.0, amount_a)?;
+            Self::transfer_asset_to_pool(&sender, trading_pair.1, amount_b)?;
+
             Ok(())
         }
     }
@@ -257,6 +264,25 @@ pub mod pallet {
                 .ok_or(Error::<T>::ArithmeticOverflow)?;
             let sqrt_product = product.integer_sqrt();
             Ok(sqrt_product)
+        }
+
+        fn transfer_asset_to_pool(
+            sender: &AccountIdOf<T>,
+            asset_id: AssetIdOf<T>,
+            amount: AssetBalanceOf<T>,
+        ) -> DispatchResult {
+            let pool_account_id = T::PalletId::get().into_account_truncating();
+
+            // Transfer the asset from the sender to the pool account
+            T::Fungibles::transfer(
+                asset_id,
+                sender,
+                &pool_account_id,
+                amount,
+                Preservation::Expendable,
+            )?;
+
+            Ok(())
         }
     }
 }
