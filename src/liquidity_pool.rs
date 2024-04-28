@@ -3,10 +3,10 @@ use crate::{AssetBalanceOf, AssetIdOf};
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::ensure;
 use frame_support::pallet_prelude::{DispatchResult, RuntimeDebug, TypeInfo};
-use frame_support::sp_runtime::traits::{
-    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, SaturatedConversion, Zero,
+use frame_support::sp_runtime::{
+    traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, SaturatedConversion, Zero},
+    DispatchError,
 };
-use sp_runtime::DispatchError;
 use std::marker::PhantomData;
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
@@ -88,10 +88,37 @@ impl<T: Config> LiquidityPool<T> {
             false => (self.reserves.1, self.reserves.0),
         };
 
-        // TODO: get amount out
+        let amount_out = Self::get_amount_out(amount_in, reserve_in, reserve_out)?;
+        ensure!(
+            amount_out >= min_amount_out,
+            Error::<T>::InsufficientAmountOut
+        );
 
-        // Temporary return value
-        Ok(amount_in)
+        if self.assets.0 == asset_in {
+            self.reserves.0 = self
+                .reserves
+                .0
+                .checked_add(&amount_in)
+                .ok_or(Error::<T>::ReserveOverflow)?;
+            self.reserves.1 = self
+                .reserves
+                .1
+                .checked_sub(&amount_out)
+                .ok_or(Error::<T>::InsufficientReserves)?;
+        } else {
+            self.reserves.0 = self
+                .reserves
+                .0
+                .checked_sub(&amount_out)
+                .ok_or(Error::<T>::InsufficientReserves)?;
+            self.reserves.1 = self
+                .reserves
+                .1
+                .checked_add(&amount_in)
+                .ok_or(Error::<T>::ReserveOverflow)?;
+        }
+
+        Ok(amount_out)
     }
 
     // Helper function to calculate the amount of tokens to receive in a swap

@@ -102,6 +102,8 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Attempted to divide by zero
         DivisionByZero,
+        /// The reserves for the asset being swapped out is not sufficient.
+        InsufficientAmountOut,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
