@@ -2,7 +2,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::pallet_prelude::*;
-use frame_support::sp_runtime::traits::{AccountIdConversion, Zero};
+use frame_support::sp_runtime::traits::{
+    AccountIdConversion, CheckedDiv, CheckedMul, IntegerSquareRoot, Zero,
+};
 use frame_support::traits::{fungible, fungibles};
 use frame_support::PalletId;
 
@@ -132,6 +134,8 @@ pub mod pallet {
         LiquidityPoolAlreadyExists,
         /// The liquidity pool with the provided asset pair not found
         LiquidityPoolNotFound,
+        /// Minted is not greater than or equal to the minimum liquidity specified
+        InsufficientLiquidityMinted,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
@@ -191,6 +195,16 @@ pub mod pallet {
                 LiquidityPools::<T>::get(&trading_pair).ok_or(Error::<T>::LiquidityPoolNotFound)?;
 
             // Calculate the liquidity minted based on the provided amounts and the current reserves
+            let liquidity_minted = Self::calculate_liquidity_minted(
+                (amount_a, amount_b),
+                (liquidity_pool.reserves.0, liquidity_pool.reserves.1),
+                liquidity_pool.total_liquidity,
+            )?;
+
+            ensure!(
+                liquidity_minted >= min_liquidity,
+                Error::<T>::InsufficientLiquidityMinted
+            );
 
             Ok(())
         }
@@ -198,6 +212,51 @@ pub mod pallet {
 
     /// The pallet's internal functions.
     impl<T: Config> Pallet<T> {
-        /* Internally Callable Functions Go Here */
+        fn calculate_liquidity_minted(
+            amounts: (AssetBalanceOf<T>, AssetBalanceOf<T>),
+            reserves: (AssetBalanceOf<T>, AssetBalanceOf<T>),
+            total_liquidity: AssetBalanceOf<T>,
+        ) -> Result<AssetBalanceOf<T>, DispatchError> {
+            let (amount_a, amount_b) = amounts;
+            let (reserve_a, reserve_b) = reserves;
+
+            ensure!(
+                !amount_a.is_zero() && !amount_b.is_zero(),
+                Error::<T>::InsufficientLiquidityMinted
+            );
+
+            let liquidity_minted = match total_liquidity.is_zero() {
+                true => Self::geometric_mean(amount_a, amount_b)?,
+                false => {
+                    let liquidity_minted_a = amount_a
+                        .checked_mul(&total_liquidity)
+                        .ok_or(Error::<T>::ArithmeticOverflow)?
+                        .checked_div(&reserve_a)
+                        .ok_or(Error::<T>::DivisionByZero)?;
+
+                    let liquidity_minted_b = amount_b
+                        .checked_mul(&total_liquidity)
+                        .ok_or(Error::<T>::ArithmeticOverflow)?
+                        .checked_div(&reserve_b)
+                        .ok_or(Error::<T>::DivisionByZero)?;
+
+                    // Choose the smaller minted liquidity to maintain the desired asset ratio
+                    sp_std::cmp::min(liquidity_minted_a, liquidity_minted_b)
+                }
+            };
+
+            Ok(liquidity_minted)
+        }
+
+        fn geometric_mean(
+            amount_a: AssetBalanceOf<T>,
+            amount_b: AssetBalanceOf<T>,
+        ) -> Result<AssetBalanceOf<T>, DispatchError> {
+            let product = amount_a
+                .checked_mul(&amount_b)
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            let sqrt_product = product.integer_sqrt();
+            Ok(sqrt_product)
+        }
     }
 }
