@@ -94,6 +94,10 @@ pub mod pallet {
         InsufficientReserves,
         LiquidityOverflow,
         ReserveOverflow,
+        /// The asset being swapped in is not part of the specified trading pair.
+        InvalidAssetIn,
+        /// The asset being swapped out is not part of the specified trading pair.
+        InvalidAssetOut,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).

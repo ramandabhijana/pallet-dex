@@ -1,8 +1,10 @@
 use crate::pallet::{Config, Error};
 use crate::{AssetBalanceOf, AssetIdOf};
 use codec::{Decode, Encode, MaxEncodedLen};
+use frame_support::ensure;
 use frame_support::pallet_prelude::{DispatchResult, RuntimeDebug, TypeInfo};
 use frame_support::sp_runtime::traits::{CheckedAdd, CheckedSub};
+use sp_runtime::DispatchError;
 use std::marker::PhantomData;
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
@@ -60,5 +62,33 @@ impl<T: Config> LiquidityPool<T> {
             .checked_sub(&liquidity_burned)
             .ok_or(Error::<T>::InsufficientLiquidity)?;
         Ok(())
+    }
+
+    // Function to swap tokens based on pool reserves
+    pub fn swap(
+        &mut self,
+        asset_in: AssetIdOf<T>,
+        amount_in: AssetBalanceOf<T>,
+        asset_out: AssetIdOf<T>,
+        min_amount_out: AssetBalanceOf<T>,
+    ) -> Result<AssetBalanceOf<T>, DispatchError> {
+        ensure!(
+            self.assets.0 == asset_in || self.assets.1 == asset_in,
+            Error::<T>::InvalidAssetIn
+        );
+        ensure!(
+            self.assets.0 == asset_out || self.assets.1 == asset_out,
+            Error::<T>::InvalidAssetOut
+        );
+
+        let (reserve_in, reserve_out) = match self.assets.0 == asset_in {
+            true => (self.reserves.0, self.reserves.1),
+            false => (self.reserves.1, self.reserves.0),
+        };
+
+        // TODO: get amount out
+
+        // Temporary return value
+        Ok(amount_in)
     }
 }
