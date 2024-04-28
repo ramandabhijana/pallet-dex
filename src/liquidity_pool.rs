@@ -20,6 +20,21 @@ pub struct LiquidityPool<T: Config> {
 }
 
 impl<T: Config> LiquidityPool<T> {
+    pub fn new(
+        assets: (AssetIdOf<T>, AssetIdOf<T>),
+        reserves: (AssetBalanceOf<T>, AssetBalanceOf<T>),
+        total_liquidity: AssetBalanceOf<T>,
+        liquidity_token: AssetIdOf<T>,
+    ) -> Self {
+        Self {
+            assets,
+            reserves,
+            total_liquidity,
+            liquidity_token,
+            _marker: PhantomData,
+        }
+    }
+
     // Function to mint liquidity tokens and update reserves
     pub fn mint(
         &mut self,

@@ -1,7 +1,11 @@
 // We make sure this pallet uses `no_std` for compiling to Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use frame_support::pallet_prelude::*;
+use frame_support::sp_runtime::traits::{AccountIdConversion, Zero};
 use frame_support::traits::{fungible, fungibles};
+use frame_support::PalletId;
+
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 
@@ -61,6 +65,9 @@ pub mod pallet {
         type Fungibles: fungibles::Inspect<Self::AccountId, AssetId = u32>
             + fungibles::Mutate<Self::AccountId>
             + fungibles::Create<Self::AccountId>;
+
+        #[pallet::constant]
+        type PalletId: Get<PalletId>;
     }
 
     /// A storage map for storing liquidity pools
@@ -83,7 +90,24 @@ pub mod pallet {
     /// Events that functions in this pallet can emit.
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
-    pub enum Event<T: Config> {/* Pallet Event Variants Go Here */}
+    pub enum Event<T: Config> {
+        /// Liquidity pool created.
+        /// Parameters:
+        /// - `T::AccountId`: The account ID of the liquidity provider who created the pool.
+        /// - `(T::AssetId, T::AssetId)`: The trading pair of the created liquidity pool.
+        LiquidityPoolCreated(AccountIdOf<T>, (AssetIdOf<T>, AssetIdOf<T>)),
+
+        /// Liquidity minted.
+        /// Parameters:
+        /// - `T::AccountId`: The account ID of the liquidity provider who minted the liquidity.
+        /// - `(T::AssetId, T::AssetId)`: The trading pair of the liquidity pool.
+        /// - `T::Balance`: The amount of liquidity tokens minted.
+        LiquidityMinted(
+            AccountIdOf<T>,
+            (AssetIdOf<T>, AssetIdOf<T>),
+            AssetBalanceOf<T>,
+        ),
+    }
 
     /// Errors that can be returned by this pallet.
     #[pallet::error]
@@ -104,12 +128,48 @@ pub mod pallet {
         DivisionByZero,
         /// The reserves for the asset being swapped out is not sufficient.
         InsufficientAmountOut,
+        /// The liquidity pool for the specified trading pair already exists.
+        LiquidityPoolAlreadyExists,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /* User Callable Functions Go Here */
+        // Dispatchable call to create a new liquidity pool
+        #[pallet::call_index(0)]
+        #[pallet::weight(Weight::default())]
+        pub fn create_liquidity_pool(
+            origin: OriginFor<T>,
+            asset_a: AssetIdOf<T>,
+            asset_b: AssetIdOf<T>,
+            liquidity_token: AssetIdOf<T>,
+        ) -> DispatchResult {
+            // ensure the origin has been signed
+            let sender = ensure_signed(origin)?;
+
+            let trading_pair = (asset_a, asset_b);
+
+            ensure!(
+                !LiquidityPools::<T>::contains_key(trading_pair),
+                Error::<T>::LiquidityPoolAlreadyExists
+            );
+
+            // Create a new liquidity pool
+            let liquidity_pool = LiquidityPool::new(
+                trading_pair,
+                (Zero::zero(), Zero::zero()),
+                Zero::zero(),
+                liquidity_token,
+            );
+
+            // Insert the new liquidity pool into the storage
+            LiquidityPools::<T>::insert(trading_pair, liquidity_pool);
+
+            // Log an event indicating that the pool was created
+            Self::deposit_event(Event::LiquidityPoolCreated(sender, trading_pair));
+
+            Ok(())
+        }
     }
 
     /// The pallet's internal functions.
