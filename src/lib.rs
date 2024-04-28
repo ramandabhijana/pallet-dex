@@ -130,6 +130,8 @@ pub mod pallet {
         InsufficientAmountOut,
         /// The liquidity pool for the specified trading pair already exists.
         LiquidityPoolAlreadyExists,
+        /// The liquidity pool with the provided asset pair not found
+        LiquidityPoolNotFound,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
@@ -167,6 +169,28 @@ pub mod pallet {
 
             // Log an event indicating that the pool was created
             Self::deposit_event(Event::LiquidityPoolCreated(sender, trading_pair));
+
+            Ok(())
+        }
+
+        #[pallet::call_index(1)]
+        #[pallet::weight(Weight::default())]
+        pub fn mint_liquidity(
+            origin: OriginFor<T>,
+            asset_a: AssetIdOf<T>,
+            asset_b: AssetIdOf<T>,
+            amount_a: AssetBalanceOf<T>,
+            amount_b: AssetBalanceOf<T>,
+            min_liquidity: AssetBalanceOf<T>,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            let trading_pair = (asset_a, asset_b);
+
+            // Get the liquidity pool from storage
+            let mut liquidity_pool =
+                LiquidityPools::<T>::get(&trading_pair).ok_or(Error::<T>::LiquidityPoolNotFound)?;
+
+            // Calculate the liquidity minted based on the provided amounts and the current reserves
 
             Ok(())
         }
