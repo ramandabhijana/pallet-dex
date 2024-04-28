@@ -5,7 +5,7 @@ use frame_support::ensure;
 use frame_support::pallet_prelude::{DispatchResult, RuntimeDebug, TypeInfo};
 use frame_support::sp_runtime::{
     traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, SaturatedConversion, Zero},
-    DispatchError,
+    DispatchError, Permill,
 };
 use std::marker::PhantomData;
 
@@ -133,21 +133,22 @@ impl<T: Config> LiquidityPool<T> {
             Error::<T>::InsufficientLiquidity
         );
 
-        // calculate the input amount with the swap fee of 0.3% by multiplying by 997 (99.7%)
-        let amount_in_with_fee = amount_in
-            .checked_mul(&AssetBalanceOf::<T>::saturated_from(997u128))
+        // Define the swap fee as Permill value 0.3%
+        let swap_fee = Permill::from_float(0.3);
+
+        // Calculate the input amount after deducting the swap fee
+        let amount_in_after_fee = amount_in
+            .checked_sub(&swap_fee.mul_floor(amount_in))
             .ok_or(Error::<T>::ArithmeticOverflow)?;
 
         // calculate the numerator of the output amount formula
-        let numerator = amount_in_with_fee
+        let numerator = amount_in_after_fee
             .checked_mul(&reserve_out)
             .ok_or(Error::<T>::ArithmeticOverflow)?;
 
         // calculate the denominator of the output amount formula
         let denominator = reserve_in
-            .checked_mul(&AssetBalanceOf::<T>::saturated_from(1000u128))
-            .ok_or(Error::<T>::ArithmeticOverflow)?
-            .checked_add(&amount_in_with_fee)
+            .checked_add(&amount_in_after_fee)
             .ok_or(Error::<T>::ArithmeticOverflow)?;
 
         // perform integer division to obtain the final output amount
