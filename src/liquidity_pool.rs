@@ -3,7 +3,9 @@ use crate::{AssetBalanceOf, AssetIdOf};
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::ensure;
 use frame_support::pallet_prelude::{DispatchResult, RuntimeDebug, TypeInfo};
-use frame_support::sp_runtime::traits::{CheckedAdd, CheckedSub};
+use frame_support::sp_runtime::traits::{
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, SaturatedConversion, Zero,
+};
 use sp_runtime::DispatchError;
 use std::marker::PhantomData;
 
@@ -90,5 +92,42 @@ impl<T: Config> LiquidityPool<T> {
 
         // Temporary return value
         Ok(amount_in)
+    }
+
+    // Helper function to calculate the amount of tokens to receive in a swap
+    fn get_amount_out(
+        amount_in: AssetBalanceOf<T>,
+        reserve_in: AssetBalanceOf<T>,
+        reserve_out: AssetBalanceOf<T>,
+    ) -> Result<AssetBalanceOf<T>, DispatchError> {
+        // ensure both reserve balances are non zero
+        ensure!(
+            !reserve_in.is_zero() && !reserve_out.is_zero(),
+            Error::<T>::InsufficientLiquidity
+        );
+
+        // calculate the input amount with the swap fee of 0.3% by multiplying by 997 (99.7%)
+        let amount_in_with_fee = amount_in
+            .checked_mul(&AssetBalanceOf::<T>::saturated_from(997u128))
+            .ok_or(Error::<T>::ArithmeticOverflow)?;
+
+        // calculate the numerator of the output amount formula
+        let numerator = amount_in_with_fee
+            .checked_mul(&reserve_out)
+            .ok_or(Error::<T>::ArithmeticOverflow)?;
+
+        // calculate the denominator of the output amount formula
+        let denominator = reserve_in
+            .checked_mul(&AssetBalanceOf::<T>::saturated_from(1000u128))
+            .ok_or(Error::<T>::ArithmeticOverflow)?
+            .checked_add(&amount_in_with_fee)
+            .ok_or(Error::<T>::ArithmeticOverflow)?;
+
+        // perform integer division to obtain the final output amount
+        let amount_out = numerator
+            .checked_div(&denominator)
+            .ok_or(Error::<T>::DivisionByZero)?;
+
+        Ok(amount_out)
     }
 }

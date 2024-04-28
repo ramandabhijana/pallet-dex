@@ -98,6 +98,10 @@ pub mod pallet {
         InvalidAssetIn,
         /// The asset being swapped out is not part of the specified trading pair.
         InvalidAssetOut,
+        /// Attempted to perform an operation that resulted in an overflow
+        ArithmeticOverflow,
+        /// Attempted to divide by zero
+        DivisionByZero,
     }
 
     /// The pallet's dispatchable functions ([`Call`]s).
